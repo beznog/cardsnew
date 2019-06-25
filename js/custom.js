@@ -6,7 +6,7 @@ $('#word_text').autocomplete({
 		// Посылаем данные через ajax на сервис переводов
 		$.ajax({
 			type: 'GET',
-			url: '../cards/php/lingvoAPI/get_full_words.php',
+			url: '/php/lingvoAPI/get_full_words.php',
 			data: 'word='+request.term,
 			success: function(data){
 				data = JSON.parse(data);
@@ -23,7 +23,7 @@ $('#word_text').autocomplete({
 	select: function(event, ui) {
 		$.ajax({
 			type: 'GET',
-			url: '../cards/php/lingvoAPI/get_word_card.php',
+			url: '/php/lingvoAPI/get_word_card.php',
 			data: 'word='+ui.item.value,
 			success: function(data){
 				data = JSON.parse(data);
@@ -80,7 +80,7 @@ function clearAll(formObj) {
 function get_images_by_word(word){
     $.ajax({
 		type: 'GET',
-		url: '../cards/php/googleSearchAPI/get_photos.php',
+		url: '/php/googleSearchAPI/get_photos.php',
 		data: 'word='+word,
 		success: function(data){
 			data = JSON.parse(data);
@@ -109,7 +109,7 @@ function fillIllustrations(parentObj, picsArr){
 
 // TO DO
 $('input:checkbox, input:radio').on('change', function(event){
-	hideNextParams($(this).parents('.parameter'));
+	hideChildParams($(this).parents('.parameter'));
 	if($(this).prop("checked")) {
 		showParams(getParamsToOpen(this));
 	}
@@ -132,20 +132,27 @@ function showParams(paramsArr) {
 		});
 	}
 }
-
-function hideNextParams(currentParam) {
+ 	
+// Скрыть все дочерние параметры рекурсивно HARDCODE
+function hideChildParams(currentParam) {
 	var nextParam = $(currentParam).nextAll('.parameter:visible').first();
-	if(nextParam.length==0) {
+	if(nextParam.length==0) { // если нет следующего параметра - прекращаем
 		return;
 	}
-	if($(currentParam).find('[data-next-params~='+$(nextParam).attr('data-parameter-name')+']').length > 0) {
-		clearParam(nextParam);
-		nextParam.addClass('hide');
-		hideNextParams(nextParam);
+	if($(currentParam).find('[data-next-params~='+$(nextParam).attr('data-parameter-name')+']').length > 0) { // следующий параметр дочерний от текущего?
+		var nextNextParam = $(nextParam).nextAll('.parameter:visible').first();
+		if($(nextParam).find('[data-next-params~='+$(nextNextParam).attr('data-parameter-name')+']').length > 0) { // а у него есть дети?
+			hideChildParams(nextParam); // для детей запускаем рекурсию
+			hideChildParams(currentParam); // родителя закрываем как ребенка currentParam
+		}
+		else {
+			$(nextParam).addClass('hide'); // закрываем одиночного ребенка currentParam
+			clearParam(nextParam);
+			hideChildParams(currentParam); // вызываем для следующего параметра
+		}
 	}
 	return;
 }
-
 
 function clearParam(paramObj) {
 	$(paramObj).find('input').prop("checked", false);
@@ -155,11 +162,6 @@ function clearParam(paramObj) {
 	$(paramObj).find('textarea').val('');
 	$(paramObj).find('select').prop('selectedIndex',0);
 }
-
-
-
-
-
 
 
 
@@ -191,6 +193,9 @@ function createTagLabel(tagName, tagsBlock) {
 		</div>').appendTo(tagsBlock);
 }
 
+var availableTags = [];
+getAllTags();
+
 
 
 // Заполняем темы слова во всех местах
@@ -201,7 +206,7 @@ function fillAllTags(data) {
 	});
 }
 // Автозаполнение при вводе лэйблов тем
-var availableTags = [];
+
 $("#add_tag_text").autocomplete({
 	source: availableTags,
 	select: function(event, ui) {setTimeout(add_tag(ui.item.value), 100);}
@@ -213,11 +218,12 @@ $("#add_tag_text").autocomplete({
 function getAllTags() {
 	$.ajax({
 		type: 'POST',
-		url: '../cards/get_labels_from_DB.php',
+		url: '/get_labels_from_DB.php',
 		data: "getLabels",
 		success: function(data){
 			if (data) {
 				data = JSON.parse(data);
+				console.log(data);
 				fillAllTags(data);
 			}
 		}
@@ -236,6 +242,45 @@ function add_tag(tagName){
 	}
 }
 
+// Клик по кнопкe ползунка (+)
+$('[data-role="btn-number-increment"]').click(function(){
+	var field = $(this).parents('.counter').find('.number-field');
+	
+	var value = Number($(field).val());
+	var max = Number($(field).attr("max"));
+
+	if(value < max) {
+		value++;
+		$(field).val(value);
+	}
+});
+
+// Клик по кнопкe ползунка (-)
+$('[data-role="btn-number-decrement"]').click(function(){
+	var field = $(this).parents('.counter').find('.number-field');
+
+	var value = Number($(field).val());
+	var min = Number($(field).attr("min"));
+
+	if(value > min) {
+		value--;
+		$(field).val(value);
+	}
+});
+
+// Creating a popup window
+function showPopUpWindow(windowObj, contentObj, timer) {
+	var popUpWindow = new Foundation.Reveal(windowObj, {'data-close-on-click':false}); // init a reveal object with options
+	$(contentObj).appendTo($(windowObj)); // add content to the window
+	$(windowObj).foundation('open'); // show pop up
+	if (typeof timer == 'number') { // if timer variable is existed, then set timeout for window
+		setTimeout(function() {
+			$(windowObj).foundation('close'); // hide pop up after ... ms
+		}, timer);
+	}
+}
+
+
 
 // + Получить данные по тэгам с сервера
 // + Отрисовать все тэги в виде кнопок
@@ -247,6 +292,7 @@ function add_tag(tagName){
 // + Создать тэг лэйбл
 
 // хандлер для лэйбла тэгов (чекбокс всегда выбран)
+
 
 /*
 // Нажатие на кнопку добавление лейбла из текстового инпута
@@ -284,25 +330,7 @@ $('label').on('click', function(event){
 
 
 
-// Клик по кнопкам ползунка (+/-)
-$('.sliderButton').click(function(){
-	var value = Number($(this).parent('.slider').find('input').val());
-	var min = 0;
-	var max = 5; 
-	
-	if ($(this).hasClass('plus')) {
-		if (value!=max) {
-			value += 1;
-		}
-	}
-	else {
-		if (value!=min) {
-			value -= 1;
-		}
-	}
-	$(this).parent('.slider').find('input').val(value);
-	$(this).parent('.slider').find('.sliderValue').html(value);
-});
+
 
 // Клик по кнопке Add to Dictionary
 $('body').on("click", ".send", function(){
